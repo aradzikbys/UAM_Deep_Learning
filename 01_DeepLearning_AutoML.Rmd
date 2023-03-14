@@ -1,0 +1,91 @@
+---
+output:
+  pdf_document: default
+theme: Flatly
+execute: 
+  warning: false
+  message: false
+  echo: false
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# AutoML case study
+
+![](agaricus.png)
+
+## Data set
+
+Mushroom data set is downloaded from kaggle.com. It contains information about
+23 species from Agaricus and Lepiota families. Mushrooms are
+classified as definitely edible (e) or poisonous/unknown edibility (p).
+
+```{r, message=FALSE, warning=FALSE}
+# Load libraries
+library(h2o)
+library(dplyr)
+
+# Start h2o cluster
+h2o.init(nthreads = -1,
+         max_mem_size = '4G')
+
+# Load file 
+mushrooms <- read.csv('https://tinyurl.com/5cxrh2h3')
+
+# Transform data set for further analysis
+mushrooms <- mushrooms %>%
+  # Remove not needed characters
+  mutate(across(1:23, ~ substr(.x, 3,3))) %>%
+  # Change columns from strings to factors
+  mutate(across(everything(), as.factor))
+
+# Load data to h2o cluster
+mushrooms_hex <- as.h2o(mushrooms, destination_frame = 'mushrooms_hex')
+
+```
+
+## Summary statistic
+
+There are 8124 observations in the data set: 4208 (51.8%) mushrooms are
+marked as edible and 3916 (48.2%) as poisonous.
+
+\
+
+Beside class (edible/poisonous) there are specified 22 physical
+attributes, i.e.: cap shape or gill attachment to the stalk.
+
+![](mushrooms_cap_shape.png){width="482"}
+\
+
+![](mushrooms_gill_attach.png){width="387"}
+
+## AutoML
+
+```{r, message=FALSE}
+# Split data set to train (75%) & test (25%)
+mushrooms_split <- h2o.splitFrame(data = mushrooms_hex, ratios = 0.75)
+
+mushrooms_train <- mushrooms_split[[1]]
+mushrooms_test <- mushrooms_split[[2]]
+
+# Create AutoML model
+mushrooms_model <- h2o.deeplearning(
+                        y = 23,
+                        x = 1:22,
+                        training_frame = mushrooms_train,
+                        validation_frame = mushrooms_test,
+                        distribution = 'multinomial',
+                        activation = 'RectifierWithDropout',
+                        hidden = c(300, 300, 300),
+                        input_dropout_ratio = 0.2,
+                        l1 = 1e-5,
+                        epochs = 60,
+                        variable_importances = TRUE)
+```
+
+## Refferences
+
+1.  <https://www.kaggle.com/datasets/ulrikthygepedersen/mushroom-attributes>
+2.  <https://en.wikipedia.org/wiki/Agaricus>
+3.  vbiolwww.usask.ca/fungi/glossary.html

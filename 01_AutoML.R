@@ -193,12 +193,14 @@ lm.predict <- h2o.predict(object = Loblolly.glm,
                           newdata = Loblolly.hex)
 
 
-
+# Basic AutoML
+# The leader model
 Loblolly.automl <- h2o.automl(y = 1, 
                               x = 2, 
                               training_frame = Loblolly.hex,
+                              # we need to specify how long learning will last
                               max_runtime_secs = 60)
-Loblolly.automl@leader # The leader model
+Loblolly.automl@leader 
 
 automl.predict <- h2o.predict(object = Loblolly.automl,
                               newdata = Loblolly.hex)
@@ -214,6 +216,8 @@ h2o.cbind(Loblolly.hex, lm.predict, automl.predict) %>%
   geom_smooth(method = 'lm', se = FALSE, size = 0.5) + 
   theme_minimal()
 
+
+
 # k-means
 h2o.kmeans(training_frame = iris.hex, 
            k = 3, 
@@ -224,12 +228,15 @@ h2o.prcomp(training_frame = iris.hex[, -5],
            transform = 'NORMALIZE', 
            k = 2)
 
-#### CASE STUDY ####
+
+
+#### CASE STUDY - MNIST####
 library(h2o)
 h2o.init(nthreads = -1)
 
 train_file <- 'https://h2o-public-test-data.s3.amazonaws.com/bigdata/laptop/mnist/train.csv.gz'
 test_file <- 'https://h2o-public-test-data.s3.amazonaws.com/bigdata/laptop/mnist/test.csv.gz'
+
 
 train <- h2o.importFile(train_file) # 13MB
 test <- h2o.importFile(test_file) # 2.1MB
@@ -256,33 +263,64 @@ test[, y] <- as.factor(test[, y])
 # Rectified linear activation is popular with image processing and has performed well on the MNIST
 # database previously and dropout has been known to enhance performance on this dataset as well, 
 # so we train our model accordingly.
+
+
 model <- h2o.deeplearning(x = x,
                           y = y,
                           training_frame = train,
+                          # test, train, validation sets are needed in deep learning
+                          # in each iteration classification will be better
+                          # validation set >> at some point quality of train data set
+                          # is dropping (model learns not general parameters, but it
+                          # learns only those TRAIN points) >> overfitting
+                          # Quality of validation data set starts to drop, this is
+                          # signal to stop process
                           validation_frame = test,
                           distribution = 'multinomial',
                           activation = 'RectifierWithDropout',
                           hidden = c(200, 200, 200),
+                          # prevents overlearning
                           input_dropout_ratio = 0.2,
                           l1 = 1e-5,
+                          # how many times data will be shown to the network
                           epochs = 10,
+                          # return metrix about variables imporatnce
                           variable_importances = TRUE)
 
-model@parameters # View the specified parameters
-model # Display all performance metrics
-h2o.performance(model, train = TRUE) # Training set metrics
-h2o.performance(model, valid = TRUE) # Validation set metrics
-h2o.mse(model, valid = TRUE) # Get MSE only
+# View the specified parameters
+model@parameters 
 
-h2o.varimp(model) # Variable importance
+# Display all performance metrics
+model 
 
-pred <- h2o.predict(model, newdata = test) # Predictions
+# Training set metrics
+h2o.performance(model, train = TRUE) 
+# Top-10 Hit Ratios: most popular in recomendation systems
+
+# Validation set metrics
+h2o.performance(model, valid = TRUE) 
+
+# Get MSE only
+h2o.mse(model, valid = TRUE) 
+
+# Variable importance
+h2o.varimp(model) 
+
+# Predictions
+pred <- h2o.predict(model, newdata = test) 
+# real data
+test[,'C785']
 head(pred)
 
+
+
 # Grid search
+# define 3 different networsk
 hidden_opt <- list(c(200, 200), c(100, 300, 100), c(500, 500, 500))
+# define l1 parameters
 l1_opt <- c(1e-5, 1e-7)
 hyper_params <- list(hidden = hidden_opt, l1 = l1_opt)
+
 model_grid <- h2o.grid('deeplearning',
                        hyper_params = hyper_params,
                        x = x,
@@ -294,7 +332,12 @@ model_grid <- h2o.grid('deeplearning',
                        search_criteria = list(strategy = 'RandomDiscrete', 
                                               max_runtime_secs = 900))
 
-summary(model_grid) # Print out all prediction errors of the models
+# Print out all prediction errors of the models
+# 6 models (hidden_opt [3] x l1_opt [2])
+# logloss >> logarytm funkcji straty
+# best model 1 (0.09694 logloss) >> 500,500,500 & 1e-5
+summary(model_grid) 
+
 # Print out the Test MSE for all of the models
 lapply(model_grid@model_ids, 
        function(model_id) 
@@ -303,3 +346,31 @@ lapply(model_grid@model_ids,
                              valid = TRUE), 6)))
 
 h2o.shutdown(prompt = TRUE) # Shut down the specified instance. All data will be lost.
+
+
+
+
+
+
+library(caret)
+install.packages('DALEX')
+library(DALEX)
+
+model.ml <- train(Species ~ .,
+                  data = iris,
+                  model = 'rf')
+
+model.ml$finalModel
+
+rf.explainer <- explain(model.ml$finalModel,
+                        data = iris,
+                        y = iris$Species)
+
+model_performance(rf.explainer)
+
+# Shape values
+rf.sh <- predict_parts(rf.explainer,
+                       iris[1,],
+                       type = 'shap')
+
+plot(rf.sh, show_boxplots = FALSE)
