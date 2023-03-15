@@ -50,12 +50,16 @@ mushrooms_split <- h2o.splitFrame(data = mushrooms_hex, ratios = 0.75)
 mushrooms_train <- mushrooms_split[[1]]
 mushrooms_test <- mushrooms_split[[2]]
 ```
+\
 
 ## Data
 
 Data set contains 8124 observations of 23 species from Agaricus and
-Lepiota families. Beside class (e - edible/p - poisonous or uknown
-edibility) there are 22 physical attributes.
+Lepiota families.\
+Beside class (e - edible/p - poisonous or uknown edibility) there are 22
+physical attributes.
+
+\
 
 ## h2o's Deep Learning
 
@@ -72,22 +76,23 @@ mushrooms_dl <- h2o.deeplearning(
                         input_dropout_ratio = 0.2,
                         l1 = 1e-5,
                         epochs = 55,
-                        variable_importances = TRUE,
-                        # Set seed for reproducible results:
-                        seed = 123)
-
+                        variable_importances = TRUE)
 ```
+
+\
+\
 
 ```{r fig.height=3, message=FALSE, warning=FALSE, paged.print=FALSE}
 # Learning curve plot
 h2o.learning_curve_plot(mushrooms_dl)
 ```
-
+\
+\
 ```{r, message = FALSE, warning=FALSE}
 # Confusion matrix
 h2o.confusionMatrix(mushrooms_dl, mushrooms_test, valid = FALSE, xval = FALSE)
 ```
-
+\
 ```{r, message = FALSE, warning=FALSE}
 # If needed, predictions can be done on test data set
 # (which was used for validation in model training)
@@ -100,6 +105,9 @@ table(as.data.frame(mushrooms_test[,23])[,1],
 
 ```
 
+\
+
+
 ```{r message=FALSE, warning=FALSE, paged.print=FALSE}
 # Importance of parameters
 h2o.varimp_plot(mushrooms_dl)
@@ -107,7 +115,7 @@ h2o.varimp_plot(mushrooms_dl)
 
 Most important parameters are odor and spore print color:
 
-```{r fig.height=2.75, message=FALSE, warning=FALSE, paged.print=FALSE, echo=FALSE}
+```{r fig.height=3, message=FALSE, warning=FALSE, paged.print=FALSE, echo=FALSE}
 ggplot(mushrooms, aes(odor)) +
   geom_bar(position="dodge", aes(fill = class)) +
   scale_fill_manual(name = 'Edible/ Poisonous', values = wes_palette('Moonrise2', type = 'discrete')) +
@@ -115,11 +123,11 @@ ggplot(mushrooms, aes(odor)) +
   scale_x_discrete(labels=c('almond', 'creosote', 'foul', 'anise', 'musty', 'none', 'pungent', 'spicy', 'fishy'))
 ```
 
-```{r fig.height=2.75, message=FALSE, warning=FALSE, paged.print=FALSE, echo=FALSE}
+```{r fig.height=3, message=FALSE, warning=FALSE, paged.print=FALSE, echo=FALSE}
 ggplot(mushrooms, aes(spore.print.color)) +
   geom_bar(position="dodge", aes(fill = class)) +
-  scale_fill_manual(name = 'Edible/Poisonous', values = wes_palette('Moonrise2', type = 'discrete')) +
-  labs(x = 'Odor', y = 'Count')+
+  scale_fill_manual(name = 'Edible/ Poisonous', values = wes_palette('Moonrise2', type = 'discrete')) +
+  labs(x = 'Spore print colour', y = 'Count')+
   scale_x_discrete(labels=c('buff', 'chocolate', 'black', 'brown', 'orange', 'green', 'purple', 'white', 'yellow'))
 ```
 
@@ -137,18 +145,28 @@ mushrooms_auoml <- h2o.automl(
 
 ```{r, message = FALSE, warning=FALSE}
 # Leader board
-df <- h2o.get_leaderboard(object = mushrooms_auoml)
+df <- h2o.get_leaderboard(object = mushrooms_auoml, extra_columns = "ALL")
 df <- as.data.frame(df)
 df$model_id <- substr(df$model_id,1,5)
-kable(df)
+df <- df %>% mutate(across(where(is.numeric), round, 3))
+df <- df[,-10]
+kable(df,
+      col.names = c('Model', 'auc', 'Log Loss', 'aucPR', 'Mean per class err.', 'RMSE',
+                    'MSE', 'Train. time [ms]', 'Predict time / row [ms]'))
 ```
+
+\
+\
 
 ```{r message=FALSE, warning=FALSE, paged.print=FALSE}
 # Variables importance heatmap for different AutoML models
 h2o.varimp_heatmap(mushrooms_auoml)
 ```
 
-```{r fig.height=2.5, message=FALSE, warning=FALSE, paged.print=FALSE}
+\
+\
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
 # Effect of odor variable for each model
 h2o.pd_multi_plot(mushrooms_auoml, mushrooms_test, "odor")
 ```

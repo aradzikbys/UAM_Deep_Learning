@@ -4,7 +4,6 @@
 library(h2o)
 library(ggplot2)
 library(dplyr)
-library(knitr)
 library(wesanderson)
 
 
@@ -30,7 +29,9 @@ mushrooms_split <- h2o.splitFrame(data = mushrooms_hex, ratios = 0.75)
 mushrooms_train <- mushrooms_split[[1]]
 mushrooms_test <- mushrooms_split[[2]]
 
-mushrooms_model <- h2o.deeplearning(
+
+# Deep learning
+mushrooms_dl <- h2o.deeplearning(
                           y = 23,
                           x = 1:22,
                           training_frame = mushrooms_train,
@@ -43,24 +44,31 @@ mushrooms_model <- h2o.deeplearning(
                           epochs = 40,
                           variable_importances = TRUE)
 
-# Mushrooms predictions
-mushroom_pred <- h2o.predict(object = mushrooms_model,
-                             newdata = mushrooms_test)
+# Model evaluation (confusion matrix + all visualizations)
+expl_mushroom <- h2o.explain(mushrooms_dl, mushrooms_test)
+print(expl_mushroom)
 
-# Confusion matrix from h2o functions
-h2o.performance(mushrooms_model, valid = TRUE)
+# Learning curve plot
+h2o.learning_curve_plot(mushrooms_dl)
+
+# Model performance
+h2o.performance(mushrooms_dl, valid = TRUE)
+
+# Confusion matrix
+h2o.confusionMatrix(mushrooms_dl, mushrooms_test, valid = FALSE, xval = FALSE)
+
+
+# Mushrooms predictions
+mushroom_pred <- h2o.predict(object = mushrooms_dl,
+                             newdata = mushrooms_test)
 
 # Confusion matrix as simple table
 table(as.data.frame(mushrooms_test[,23])[,1],
       as.data.frame(mushroom_pred[,1])[,1])
 
 
-# Model evaluation
-expl_mushroom <- h2o.explain(mushrooms_model, mushrooms_test)
-print(expl_mushroom)
-
 # Variables importance
-h2o.varimp_plot(mushrooms_model)
+h2o.varimp_plot(mushrooms_dl)
 
 # Odor vs class
 ggplot(mushrooms, aes(odor)) +
@@ -70,8 +78,7 @@ ggplot(mushrooms, aes(odor)) +
   scale_x_discrete(labels=c('almond', 'creosote', 'foul', 'anise', 'musty', 'none',
                             'pungent', 'spicy', 'fishy'))
 
-
-# Odor vs class
+# Spore print color vs class
 ggplot(mushrooms, aes(spore.print.color)) +
   geom_bar(position="dodge", aes(fill = class)) +
   scale_fill_manual(name = 'Edible/Poisonous', values = wes_palette('Moonrise2', type = 'discrete')) +
@@ -80,6 +87,7 @@ ggplot(mushrooms, aes(spore.print.color)) +
                             'purple', 'white', 'yellow'))
 
 
+# AutoML
 mushrooms_auoml <- h2o.automl(y = 23,
                               x = 1:22,
                               training_frame = mushrooms_train,
@@ -87,10 +95,22 @@ mushrooms_auoml <- h2o.automl(y = 23,
                               max_models = 20)
 
 
-h2o.pd_multi_plot(mushrooms_auoml, mushrooms_test, "odor")
-
+# Models leader board
 df <- h2o.get_leaderboard(object = mushrooms_auoml, extra_columns = "ALL")
+
+# Convert h20 frame to dataframe & edit
 df <- as.data.frame(df)
 df$model_id <- substr(df$model_id,1,5)
+
+df <- df %>% mutate(across(where(is.numeric), round, 4))
+df <- df[,-10]
+head(df)
+
+# Variables importance heatmap for different AutoML models
+h2o.varimp_heatmap(mushrooms_auoml)
+
+# Effect of odor variable for each model
+h2o.pd_multi_plot(mushrooms_auoml, mushrooms_test, "odor")
+
 
 h2o.shutdown(prompt = TRUE)
