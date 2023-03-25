@@ -62,11 +62,14 @@ img_cols <- 28
 x_train <- array_reshape(x_train,
                          c(nrow(x_train),
                            img_rows,
+            # 1 channel >> since pictures are black and white
+            # For color pictures >> 3 canals
                            img_cols, 1))
 x_test <- array_reshape(x_test,
                         c(nrow(x_test),
                           img_rows,
                           img_cols, 1))
+# Input: 28x28x1 (for colored 28x28x3) instead of 28x28
 input_shape <- c(img_rows,
                  img_cols, 1)
 ```
@@ -94,12 +97,16 @@ head(y_train, 9)
 ### Defining the model
 ```{r model}
 model <- keras_model_sequential() %>%
+  # convolution 2d - flat images
+                # filters - how many kernels?
   layer_conv_2d(filters = 32,
                 kernel_size = c(3, 3),
                 activation = 'relu',
-                input_shape = input_shape) %>% # (3 * 3 * 1 + 1) * 32 = 320 
+                # 28 x 28 x 1
+                input_shape = input_shape) %>% # How many parameters? (3 * 3 * 1 + 1) * 32 = 320
   # (filter_rows * filter_cols * filters_previous_layer + 1) * filters
-  layer_batch_normalization() %>% # 2 * 32 + 2 * 32 = 128 (2 learnable & 2 non-learnable)
+  # 2 * 32 + 2 * 32 = 128 (2 learnable & 2 non-learnable)
+  layer_batch_normalization() %>% 
   layer_max_pooling_2d(pool_size = c(2, 2)) %>%
   layer_conv_2d(filters = 64, 
                 kernel_size = c(3, 3), 
@@ -122,8 +129,8 @@ summary(model)
 
 ### Plot the model
 ```{r}
-# devtools::install_github('andrie/deepviz')
-# deepviz::plot_model(model)
+devtools::install_github('andrie/deepviz')
+deepviz::plot_model(model)
 ```
 
 ### Compile the model
@@ -150,6 +157,7 @@ model %>% fit(x_train,
               validation_split = 0.2 # Percent of data in validation sets
               # callbacks = callback_tensorboard('logs/run_a')
 ) -> model_cnn 
+# 375 = 0.8 * 60000 / 128
 plot(model_cnn)
 ```
 
@@ -199,7 +207,7 @@ conf_table %>%
   geom_tile() +
   geom_text(aes(label = Freq), vjust = 0.5, fontface  = 'bold', alpha = 1) + 
   scale_fill_manual(values = c(Correct = 'green', Incorrect = 'red')) +
-  guides(alpha = FALSE) + 
+  guides(alpha = 'none') + 
   theme_bw() + 
   ylim(rev(levels(conf_table$Reference)))
 ```
