@@ -8,3 +8,11 @@ cat_dog_panda/
 mushroom_dataset/
 
 mushroom_dataset.zip
+
+config.properties
+
+.ipynb_checkpoints/
+
+.idea/
+
+c_d_p/
