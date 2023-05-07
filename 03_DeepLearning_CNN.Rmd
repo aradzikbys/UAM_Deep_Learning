@@ -1,0 +1,66 @@
+---
+output:
+  pdf_document: default
+theme: Flatly
+execute: 
+  warning: false
+  message: false
+  echo: false
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Convolutional Neural Networks with webscrapping in Python
+
+![](02_fashionmnist.png)
+
+## Set up - load libraries
+
+```{r, message = FALSE, warning=FALSE}
+# R libraries
+# Deep learning
+tensorflow::install_tensorflow()
+library(keras)
+library(tensorflow)
+
+# Data wrangling
+library(tidyverse)
+
+# Image manipulation
+library(imager)
+
+# Model Evaluation
+library(caret)
+```
+## Data
+
+Data set of ... pictures downloaded from www.grzyby.pl.
+
+\
+
+
+
+## Data set preparation
+
+```{r, message = FALSE, warning=FALSE}
+
+
+```
+
+\
+
+```{r, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+
+```
+
+## DNN models
+
+## References
+
+1.  **Data set**: mushroom pictures downloaded from
+    <https://www.grzyby.pl> with author permission. (c) Marek
+    Snowarski - Fungi of Poland - www.grzyby.pl
+
+2.  

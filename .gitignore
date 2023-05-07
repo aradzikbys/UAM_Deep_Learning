@@ -18,3 +18,21 @@ config.properties
 c_d_p/
 
 deep_mushroom/
+
+mushroom_dict_clean_1_photos.pkl
+
+mushroom_dict_clean_2_photos.pkl
+
+mushroom_dict_clean_3_photos.pkl
+
+mushroom_dict_clean_4_photos.pkl
+
+mushroom_dict_clean_5_photos.pkl
+
+*.pkl
+
+*.log
+
+03_DeepLearning_CNN.tex
+
+*.jpg
