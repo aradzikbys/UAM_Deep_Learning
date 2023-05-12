@@ -8,7 +8,9 @@ library(tensorflow)
 # use_condaenv("r-tensorflow")
 
 # Data wrangling
-library(tidyverse)
+library(purrr)
+library(dplyr)
+library(stringr)
 
 # Image manipulation
 library(imager)
@@ -19,14 +21,8 @@ library(caret)
 
 # set directory paths
 train_dir <- "C:/Users/User/OneDrive/Edu/Deep Learning/deep_mushroom/"
-
 folders <- list.files(train_dir)
-
 folders_paths <- paste0(train_dir,folders,'/') 
-
-train_deadly_dir <- folders_paths[1]
-train_edible_dir <- folders_paths[2]
-train_non_edible_dir <- folders_paths[3]
 
 # Get files names
 file_name <- map(folders_paths, 
@@ -40,13 +36,13 @@ length(file_name)
 head(file_name)
 
 # Randomly select image
-set.seed(999)
+set.seed(111)
 sample_image <- sample(file_name, 6)
 
 # Load image into R
 img <- map(sample_image, load.image)
 
-# Plot image
+# Plot images
 par(mfrow = c(2, 3)) # Create 2 x 3 image grid
 map(img, plot)
 
@@ -63,30 +59,25 @@ get_dim <- function(x){
 }
 
 
-# Randomly get 2000 sample images
-set.seed(999)
-sample_file <- sample(file_name, 5000)
-
-# Get dimension of selected images:
+# Get dimension of all images:
 # run the get_dim() function for each image
-file_dim <- map_df(sample_file, get_dim)
+file_dim <- map_df(file_name, get_dim)
 
 head(file_dim, 10)
 
 # Smallest pictures have ~50x50px height/width, mean is ~150x200px
-# we need to resize pictures >> we will set 100x100
+# we need to resize pictures >> we will set 150x150
 summary(file_dim)
 
 # Desired height and width of images
-target_size <- c(100,100)
+target_size <- c(150,150)
 
 # Batch size for training the model
-batch_size <- 64
+batch_size <- 8
 
 # Image generator
 train_data_gen <- image_data_generator(rescale = 1/255,
                                        horizontal_flip = T,
-                                       vertical_flip = T,
                                        fill_mode = 'nearest',
                                        validation_split = 0.2)
 
@@ -111,23 +102,31 @@ valid_img_array <- flow_images_from_directory(directory = train_dir,
 # Number of classes to predict:
 (output_n <- n_distinct(train_img_array$classes))
 
+# Frequency of each class
+table("\nFrequency" = factor(train_img_array$classes)
+      ) %>% 
+  prop.table()
+
+
 # Define model architecture
-simple_model <- keras_model_sequential() %>%
+simple_model <- keras_model_sequential(name = 'simple_model') %>%
   
   layer_conv_2d(filters = 32,
                 kernel_size = c(3, 3),
+                padding = "same",
                 activation = "relu",
                 input_shape = c(target_size, 3)) %>%
-  
-  layer_batch_normalization() %>% 
   
   layer_average_pooling_2d(pool_size = c(2, 2)) %>%
   
   layer_flatten() %>%
   
-  layer_dense(units = 128, activation = "relu") %>%
+  layer_dense(units = 16, activation = "relu") %>%
+  
+  layer_dense(units = 32, activation = "relu") %>%
   
   layer_dense(units = output_n, activation = "softmax")
+
 
 # Model summary
 simple_model
@@ -141,7 +140,7 @@ simple_model %>% compile(
 # Train model
 simple_model %>% fit_generator(train_img_array,
                                steps_per_epoch = length(train_img_array),
-                               epochs = 15,
+                               epochs = 50,
                                validation_data = valid_img_array,
                                validation_steps = length(valid_img_array)) -> simple_model_hist
 
@@ -151,9 +150,9 @@ plot(simple_model_hist)
 
 
 # Validation data set
-val_data <- data.frame(file_name = paste0('C:/Users/User/OneDrive/Edu/Deep Learning/mushroom_dataset/',
+val_data <- data.frame(file_name = paste0('C:/Users/User/OneDrive/Edu/Deep Learning/deep_mushroom/',
                                           valid_img_array$filenames)) %>% 
-  mutate(class = str_extract(file_name, 'edible|poisonous'))
+  mutate(class = str_extract(file_name, 'agaricus|amanita|boletus|hygrocybe|leccinum|russula'))
 
 head(val_data, 10)
 tail(val_data,10)
@@ -188,8 +187,12 @@ head(pred_test, 10)
 
 # Convert encoding to label
 decode <- function(x){
-  case_when(x == 0 ~ 'edible',
-            x == 1 ~ 'poisonous')
+  case_when(x == 0 ~ 'agaricus',
+            x == 1 ~ 'amanita',
+            x == 2 ~ 'boletus',
+            x == 3 ~ 'hygrocybe',
+            x == 4 ~ 'leccinum',
+            x == 5 ~ 'russula')
   }
 
 pred_test <- sapply(pred_test, decode) 
@@ -201,49 +204,51 @@ confusionMatrix(as.factor(pred_test),
 
 
 # Improve model
-model_big <- keras_model_sequential() %>% 
+model_big <- keras_model_sequential(name = 'model_big') %>%
   
-  # First convolutional layer
-  layer_conv_2d(filters = 32, kernel_size = c(5,5),
-                padding = "same", activation = "relu",
-                input_shape = c(target_size, 3)) %>% 
+  layer_conv_2d(filters = 64,
+                kernel_size = c(5, 5),
+                padding = "same", #optional?
+                activation = "relu",
+                input_shape = c(target_size, 3)) %>%
   
-  # Second convolutional layer
-  layer_conv_2d(filters = 32, kernel_size = c(3,3),
-                padding = "same", activation = "relu") %>% 
+  layer_conv_2d(filters = 32,
+                kernel_size = c(3, 3),
+                padding = "same",
+                activation = "relu") %>%
   
-  # Max pooling layer
+  
+  layer_conv_2d(filters = 32,
+                kernel_size = c(3, 3),
+                padding = "same",
+                activation = "relu") %>%
+  
   layer_max_pooling_2d(pool_size = c(2,2)) %>% 
   
-  # Third convolutional layer
-  layer_conv_2d(filters = 64, kernel_size = c(3,3),
-                padding = "same", activation = "relu") %>% 
+  layer_conv_2d(filters = 64,
+                kernel_size = c(3, 3),
+                padding = "same",
+                activation = "relu") %>%
   
-  # Max pooling layer
+  layer_conv_2d(filters = 32,
+                kernel_size = c(3, 3),
+                padding = "same",
+                activation = "relu") %>%
+  
   layer_max_pooling_2d(pool_size = c(2,2)) %>% 
   
-  # Fourth convolutional layer
-  layer_conv_2d(filters = 128, kernel_size = c(3,3),
-                padding = "same", activation = "relu") %>% 
+  layer_flatten() %>%
   
-  # Max pooling layer
-  layer_max_pooling_2d(pool_size = c(2,2)) %>% 
+  layer_dense(units = 16, activation = "relu") %>%
   
-  # Fifth convolutional layer
-  layer_conv_2d(filters = 256, kernel_size = c(3,3),
-                padding = "same", activation = "relu") %>% 
+  layer_dense(units = 32, activation = "relu") %>%
   
-  # Max pooling layer
-  layer_max_pooling_2d(pool_size = c(2,2)) %>% 
+  layer_dense(units = 32, activation = "relu") %>%
   
-  # Flattening layer
-  layer_flatten() %>% 
+  layer_dense(units = 32, activation = "relu") %>%
   
-  # Dense layer
-  layer_dense(units = 64, activation = "relu") %>% 
-  
-  # Output layer
-  layer_dense(name = "Output", units = 2, activation = "softmax")
+  layer_dense(units = output_n, activation = "softmax")
+
 
 model_big
 
